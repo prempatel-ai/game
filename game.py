@@ -49,7 +49,7 @@ MIN_PLAYER_SPEED = 0
 MAX_PLAYER_SPEED = 20
 TRAFFIC_MIN_SPEED = 5          # Slower traffic to overtake
 TRAFFIC_MAX_SPEED = 9
-SPAWN_INTERVAL = 1800           # milliseconds between spawns
+SPAWN_INTERVAL = 1000           # milliseconds between spawns
 
 # ============================================================
 #                    Traffic Car Class
