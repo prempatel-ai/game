@@ -1,11 +1,14 @@
 """
+
 2D Highway Driving Game - Overtaking Style
 A realistic highway driving game where you overtake slower traffic
 
 Controls:
-- LEFT/RIGHT Arrow: Change lanes
-- UP Arrow: Speed up
-- DOWN Arrow: Slow down
+- Arrow Keys OR WASD: Control car
+  * UP/W: Speed up
+  * DOWN/S: Slow down
+  * LEFT/A: Change lane left
+  * RIGHT/D: Change lane right
 - ESC: Quit game
 
 By Prem Patel (Refactored for realistic overtaking gameplay)
@@ -41,11 +44,11 @@ OBSTACLE_COLOR = (30, 144, 255) # Dodger blue traffic
 TEXT_COLOR = (255, 255, 255)    # White
 
 # Game settings
-PLAYER_BASE_SPEED = 0          # Player's forward speed
+PLAYER_BASE_SPEED = 0           # Player's forward speed
 MIN_PLAYER_SPEED = 0
-MAX_PLAYER_SPEED = 15
-TRAFFIC_MIN_SPEED = 0           # Slower traffic to overtake
-TRAFFIC_MAX_SPEED = 7
+MAX_PLAYER_SPEED = 20
+TRAFFIC_MIN_SPEED = 5          # Slower traffic to overtake
+TRAFFIC_MAX_SPEED = 9
 SPAWN_INTERVAL = 1800           # milliseconds between spawns
 
 # ============================================================
@@ -75,6 +78,33 @@ class TrafficCar:
         # Relative speed = player speed - traffic speed
         # This makes traffic appear to move backward relative to player
         self.y += player_speed - self.speed
+    
+    def check_collision_with_traffic(self, other_cars):
+        """
+        Check if this car is colliding with other traffic cars.
+        Adjust speed to maintain safe distance (realistic physics).
+        """
+        my_rect = self.get_rect()
+        
+        for other in other_cars:
+            if other is self:  # Don't check collision with self
+                continue
+            
+            # Only check cars in the same lane
+            if other.lane == self.lane:
+                other_rect = other.get_rect()
+                
+                # Check if cars are too close (within collision range)
+                # We need to check vertical distance
+                vertical_distance = abs(self.y - other.y)
+                
+                # If too close and this car is behind the other
+                if vertical_distance < self.height + 10 and self.y > other.y:
+                    # Match speed with car ahead to maintain safe distance
+                    self.speed = min(self.speed, other.speed)
+                    # Maintain minimum gap
+                    if vertical_distance < self.height + 5:
+                        self.y = other.y + other.height + 5
     
     def draw(self, screen):
         """Render the traffic car with realistic appearance."""
@@ -177,19 +207,21 @@ class HighwayGame:
         """Process keyboard input for speed control."""
         keys = pygame.key.get_pressed()
         
-        # Speed control - affects how fast you overtake
-        if keys[pygame.K_UP]:
+        # Speed control - Arrow keys OR WASD
+        if keys[pygame.K_UP] or keys[pygame.K_w]:
             self.speed = min(self.speed + 0.15, MAX_PLAYER_SPEED)
-        if keys[pygame.K_DOWN]:
+        if keys[pygame.K_DOWN] or keys[pygame.K_s]:
             self.speed = max(self.speed - 0.15, MIN_PLAYER_SPEED)
     
     def handle_lane_change(self, event):
-        """Handle lane change input with key press events."""
+        """Handle lane change input with key press events - Arrow keys OR WASD."""
         if event.type == pygame.KEYDOWN and not self.is_changing_lane:
-            if event.key == pygame.K_LEFT and self.target_lane > 0:
+            # Left lane change: LEFT arrow OR A key
+            if (event.key == pygame.K_LEFT or event.key == pygame.K_a) and self.target_lane > 0:
                 self.target_lane -= 1
                 self.is_changing_lane = True
-            elif event.key == pygame.K_RIGHT and self.target_lane < LANE_COUNT - 1:
+            # Right lane change: RIGHT arrow OR D key
+            elif (event.key == pygame.K_RIGHT or event.key == pygame.K_d) and self.target_lane < LANE_COUNT - 1:
                 self.target_lane += 1
                 self.is_changing_lane = True
     
@@ -218,6 +250,11 @@ class HighwayGame:
         # Update traffic cars
         player_rect = self.get_car_rect()
         
+        # First pass: Check traffic-to-traffic collisions (realistic physics)
+        for car in self.traffic:
+            car.check_collision_with_traffic(self.traffic)
+        
+        # Second pass: Update positions
         for car in self.traffic[:]:
             old_y = car.y
             car.update(self.speed)
