@@ -177,7 +177,7 @@ class HighwayGame:
     
     def __init__(self):
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-        pygame.display.set_caption("Highway Overtaking Game")
+        pygame.display.set_caption("2d-Self-driving car's simulater")
         
         self.clock = pygame.time.Clock()
         self.font = pygame.font.Font(None, 36)
