@@ -1,5 +1,4 @@
 """
-
 2D Highway Driving Game - Overtaking Style
 A realistic highway driving game where you overtake slower traffic
 
@@ -118,53 +117,97 @@ class TrafficCar:
                         self.y = other.y + other.height + 5
     
     def draw(self, screen):
-        """Render the traffic car with realistic appearance."""
+        """Render traffic as a realistic Retro-Arcade Sports Car."""
         cx, cy = int(self.x), int(self.y)
+        w, h = self.width, self.height
         
-        # Shadow
-        shadow = pygame.Surface((self.width + 3, self.height + 3), pygame.SRCALPHA)
-        pygame.draw.rect(shadow, (0, 0, 0, 50), (0, 0, self.width + 3, self.height + 3), border_radius=6)
-        screen.blit(shadow, (cx - 1, cy + 2))
+        # --- COLORS ---
+        # We derive shades from the car's base color for a 3D effect
+        base = self.color
+        # Darker shade for sides/outline
+        dark = (max(0, base[0]-60), max(0, base[1]-60), max(0, base[2]-60))
+        # Lighter shade for hood highlights
+        light = (min(255, base[0]+40), min(255, base[1]+40), min(255, base[2]+40))
         
-        # Main body with rounded corners
-        pygame.draw.rect(screen, self.color, (cx, cy, self.width, self.height), border_radius=5)
+        BLACK = (15, 15, 15)
+        GLASS = (20, 25, 30)       # Dark tinted glass
+        HEADLIGHT_GREY = (200, 200, 200) # Pop-up lights
+
+        # --- 1. SHADOW ---
+        shadow_surf = pygame.Surface((w + 4, h + 4), pygame.SRCALPHA)
+        pygame.draw.rect(shadow_surf, (0, 0, 0, 60), (0, 0, w + 4, h + 4), border_radius=4)
+        screen.blit(shadow_surf, (cx - 2, cy + 4))
+
+        # --- 2. TIRES (Pixel Style) ---
+        # Just small dark nubs sticking out slightly
+        tire_positions = [cy + 12, cy + h - 18]
+        for ty in tire_positions:
+            pygame.draw.rect(screen, (25, 25, 25), (cx - 2, ty, 4, 10)) # Left
+            pygame.draw.rect(screen, (25, 25, 25), (cx + w - 2, ty, 4, 10)) # Right
+
+        # --- 3. CHASSIS BODY ---
+        # Draw the darker base first (acts as the side skirts/outline)
+        pygame.draw.rect(screen, dark, (cx, cy, w, h), border_radius=5)
+        # Draw the main top surface (slightly inset to reveal dark sides)
+        pygame.draw.rect(screen, base, (cx + 3, cy, w - 6, h - 2), border_radius=3)
+
+        # --- 4. HOOD DETAILS (The "V" Shape) ---
+        # Draw a lighter defined hood area
+        hood_poly = [
+            (cx + 6, cy + 25),          # Bottom Left of hood
+            (cx + w - 6, cy + 25),      # Bottom Right of hood
+            (cx + w - 8, cy + 4),       # Top Right
+            (cx + 8, cy + 4)            # Top Left
+        ]
+        pygame.draw.polygon(screen, light, hood_poly)
         
-        # Body highlight
-        highlight = (60, 170, 255)
-        pygame.draw.rect(screen, highlight, (cx + 2, cy + 2, self.width - 4, self.height - 4), border_radius=4)
+        # Center Hood Vent (Dark line down the middle)
+        pygame.draw.rect(screen, dark, (cx + w//2 - 1, cy + 6, 2, 15))
+
+        # --- 5. POP-UP HEADLIGHTS ---
+        # The signature square lights at the front
+        pygame.draw.rect(screen, HEADLIGHT_GREY, (cx + 4, cy + 2, 7, 7), border_radius=1)
+        pygame.draw.rect(screen, HEADLIGHT_GREY, (cx + w - 11, cy + 2, 7, 7), border_radius=1)
         
-        # Roof
-        roof_color = (20, 100, 180)
-        pygame.draw.rect(screen, roof_color, (cx + 8, cy + 20, self.width - 16, 30), border_radius=3)
+        # Grid pattern inside lights
+        pygame.draw.line(screen, (150, 150, 150), (cx + 4, cy + 5), (cx + 11, cy + 5), 1)
+        pygame.draw.line(screen, (150, 150, 150), (cx + w - 11, cy + 5), (cx + w - 4, cy + 5), 1)
+
+        # --- 6. CABIN (Glass) ---
+        # Front Windshield (Dark trapezoid)
+        glass_points = [
+            (cx + 5, cy + 26),        # Front Left
+            (cx + w - 5, cy + 26),    # Front Right
+            (cx + w - 7, cy + 42),    # Back Right
+            (cx + 7, cy + 42)         # Back Left
+        ]
+        pygame.draw.polygon(screen, GLASS, glass_points)
         
-        # Front windshield (angled)
-        windshield = (150, 220, 255)
-        pygame.draw.polygon(screen, (100, 150, 200), [
-            (cx + 8, cy + 8), (cx + 32, cy + 8), (cx + 28, cy + 22), (cx + 12, cy + 22)
-        ])
-        pygame.draw.polygon(screen, windshield, [
-            (cx + 10, cy + 10), (cx + 30, cy + 10), (cx + 27, cy + 21), (cx + 13, cy + 21)
-        ])
+        # Windshield Glare (The white streak)
+        pygame.draw.line(screen, (200, 220, 230), (cx + 8, cy + 28), (cx + 12, cy + 38), 2)
+
+        # Roof (Body colored block)
+        pygame.draw.rect(screen, base, (cx + 6, cy + 42, w - 12, 14))
         
-        # Rear windshield
-        pygame.draw.polygon(screen, (100, 150, 200), [
-            (cx + 12, cy + 48), (cx + 28, cy + 48), (cx + 32, cy + 62), (cx + 8, cy + 62)
-        ])
-        pygame.draw.polygon(screen, windshield, [
-            (cx + 13, cy + 49), (cx + 27, cy + 49), (cx + 30, cy + 61), (cx + 10, cy + 61)
-        ])
+        # Rear Window (Smaller dark rectangle)
+        pygame.draw.rect(screen, GLASS, (cx + 7, cy + 56, w - 14, 6))
+
+        # --- 7. REAR SPOILER ---
+        # The black wing at the back (iconic to your image)
+        spoiler_y = cy + h - 9
+        # Wing supports
+        pygame.draw.rect(screen, dark, (cx + 6, spoiler_y - 2, 3, 3))
+        pygame.draw.rect(screen, dark, (cx + w - 9, spoiler_y - 2, 3, 3))
+        # The Main Wing
+        pygame.draw.rect(screen, BLACK, (cx + 2, spoiler_y, w - 4, 6), border_radius=2)
+
+        # --- 8. TAILLIGHTS & EXHAUST ---
+        # Red strip under the spoiler
+        pygame.draw.rect(screen, (220, 0, 0), (cx + 5, cy + h - 3, w - 10, 2))
         
-        # Headlights
-        pygame.draw.ellipse(screen, (255, 255, 150), (cx + 6, cy + 2, 8, 5))
-        pygame.draw.ellipse(screen, (255, 255, 150), (cx + 26, cy + 2, 8, 5))
-        
-        # Taillights
-        pygame.draw.ellipse(screen, (200, 0, 0), (cx + 6, cy + 63, 8, 5))
-        pygame.draw.ellipse(screen, (200, 0, 0), (cx + 26, cy + 63, 8, 5))
-        
-        # Side mirrors
-        pygame.draw.rect(screen, (120, 120, 120), (cx - 2, cy + 28, 3, 6))
-        pygame.draw.rect(screen, (120, 120, 120), (cx + 39, cy + 28, 3, 6))
+        # Exhaust pipe (Tiny grey dot at bottom center)
+        pygame.draw.circle(screen, (80, 80, 80), (cx + w//2 - 2, cy + h + 1), 2)
+        pygame.draw.circle(screen, (80, 80, 80), (cx + w//2 + 2, cy + h + 1), 2)
     
     def get_rect(self):
         """Return collision rectangle."""
@@ -308,7 +351,7 @@ class HighwayGame:
         # Road borders
         pygame.draw.line(self.screen, LINE_COLOR, (ROAD_X, 0), (ROAD_X, SCREEN_HEIGHT), 4)
         pygame.draw.line(self.screen, LINE_COLOR, 
-                        (ROAD_X + ROAD_WIDTH, 0), (ROAD_X + ROAD_WIDTH, SCREEN_HEIGHT), 4)
+                         (ROAD_X + ROAD_WIDTH, 0), (ROAD_X + ROAD_WIDTH, SCREEN_HEIGHT), 4)
         
         # Lane markings (animated dashed lines moving backward)
         dash_height = 30
@@ -324,76 +367,89 @@ class HighwayGame:
                 )
     
     def draw_car(self):
-        """Render the player's car with realistic details."""
-        car_rect = self.get_car_rect()
-        cx, cy = car_rect.x, car_rect.y
+        """Render the Hero Car as a Waymo (Jaguar I-PACE style) with LiDAR."""
+        # Calculate coordinates
+        cx = int(ROAD_X + self.lane_index * LANE_WIDTH + (LANE_WIDTH - CAR_WIDTH) // 2 + self.car_x_offset)
+        cy = int(self.car_y)
+        w, h = CAR_WIDTH, CAR_HEIGHT
+        screen = self.screen
+
+        # Colors
+        WAYMO_WHITE = (245, 245, 245) # Classic Waymo White
+        SENSOR_BLACK = (10, 10, 10)
+        GLASS_COLOR = (20, 25, 30)
+        LIDAR_GLOW = (0, 255, 100) # Tech Green/Cyan scanning color
+
+        # --- 1. SHADOW ---
+        shadow_surf = pygame.Surface((w + 10, h + 10), pygame.SRCALPHA)
+        pygame.draw.ellipse(shadow_surf, (0, 0, 0, 60), (0, 0, w + 10, h + 10))
+        screen.blit(shadow_surf, (cx - 5, cy + 2))
+
+        # --- 2. TIRES ---
+        wheel_positions = [
+            (cx, cy + 10),           # Front Left
+            (cx + w - 6, cy + 10),   # Front Right
+            (cx, cy + h - 18),       # Rear Left
+            (cx + w - 6, cy + h - 18)# Rear Right
+        ]
+        for wx, wy in wheel_positions:
+            pygame.draw.rect(screen, (30, 30, 30), (wx, wy, 6, 12), border_radius=2)
+
+        # --- 3. MAIN BODY (SUV Shape) ---
+        # Slightly boxier/wider at the back for the I-PACE look
+        pygame.draw.rect(screen, WAYMO_WHITE, (cx, cy, w, h), border_radius=10)
         
-        # Shadow effect
-        shadow = pygame.Surface((CAR_WIDTH + 4, CAR_HEIGHT + 4), pygame.SRCALPHA)
-        pygame.draw.rect(shadow, (0, 0, 0, 60), (0, 0, CAR_WIDTH + 4, CAR_HEIGHT + 4), border_radius=8)
-        self.screen.blit(shadow, (cx - 2, cy + 2))
+        # --- 4. CORNER SENSORS (The "Waymo" Signature) ---
+        # Little black pods on the 4 corners
+        sensor_size = 4
+        # Front Left
+        pygame.draw.rect(screen, SENSOR_BLACK, (cx - 2, cy + 8, sensor_size, sensor_size + 4), border_radius=1)
+        # Front Right
+        pygame.draw.rect(screen, SENSOR_BLACK, (cx + w - 2, cy + 8, sensor_size, sensor_size + 4), border_radius=1)
+        # Rear Left
+        pygame.draw.rect(screen, SENSOR_BLACK, (cx - 2, cy + h - 15, sensor_size, sensor_size + 4), border_radius=1)
+        # Rear Right
+        pygame.draw.rect(screen, SENSOR_BLACK, (cx + w - 2, cy + h - 15, sensor_size, sensor_size + 4), border_radius=1)
+
+        # --- 5. GLASS ROOF & WINDSHIELD ---
+        # Large panoramic glass
+        glass_pts = [
+            (cx + 6, cy + 15),     # Front Left
+            (cx + w - 6, cy + 15), # Front Right
+            (cx + w - 8, cy + h - 10), # Rear Right
+            (cx + 8, cy + h - 10)  # Rear Left
+        ]
+        pygame.draw.polygon(screen, GLASS_COLOR, glass_pts)
+
+        # --- 6. LIDAR DOME (The Roof Scanner) ---
+        # The main cylinder on top
+        lidar_x, lidar_y = cx + w//2, cy + h//2 - 5
         
-        # Main car body with rounded corners
-        pygame.draw.rect(self.screen, CAR_COLOR, car_rect, border_radius=6)
+        # Base of LiDAR
+        pygame.draw.circle(screen, (50, 50, 50), (lidar_x, lidar_y), 7)
+        # Top of LiDAR (Black)
+        pygame.draw.circle(screen, (0, 0, 0), (lidar_x, lidar_y), 5)
         
-        # Car body highlights (3D effect)
-        highlight_color = (255, 60, 90)
-        pygame.draw.rect(self.screen, highlight_color, 
-                        (cx + 2, cy + 2, CAR_WIDTH - 4, CAR_HEIGHT - 4), border_radius=5)
+        # "Scanning" Effect - A rotating line or pulse
+        # We use current time to animate the angle
+        import math
+        time_now = pygame.time.get_ticks()
+        angle = (time_now % 1000) / 1000.0 * 6.28 # Full rotation every 1 second
         
-        # Car roof (darker shade)
-        roof_color = (180, 15, 50)
-        pygame.draw.rect(self.screen, roof_color, 
-                        (cx + 8, cy + 20, CAR_WIDTH - 16, 30), border_radius=4)
-        
-        # Front windshield with gradient effect
-        windshield_color = (100, 180, 255)
-        windshield_dark = (60, 120, 200)
-        
-        # Front windshield
-        pygame.draw.polygon(self.screen, windshield_dark, [
-            (cx + 8, cy + 8),
-            (cx + 32, cy + 8),
-            (cx + 28, cy + 22),
-            (cx + 12, cy + 22)
-        ])
-        pygame.draw.polygon(self.screen, windshield_color, [
-            (cx + 10, cy + 10),
-            (cx + 30, cy + 10),
-            (cx + 27, cy + 21),
-            (cx + 13, cy + 21)
-        ])
-        
-        # Rear windshield
-        pygame.draw.polygon(self.screen, windshield_dark, [
-            (cx + 12, cy + 48),
-            (cx + 28, cy + 48),
-            (cx + 32, cy + 62),
-            (cx + 8, cy + 62)
-        ])
-        pygame.draw.polygon(self.screen, windshield_color, [
-            (cx + 13, cy + 49),
-            (cx + 27, cy + 49),
-            (cx + 30, cy + 61),
-            (cx + 10, cy + 61)
-        ])
-        
-        # Headlights
-        pygame.draw.ellipse(self.screen, (255, 255, 200), (cx + 6, cy + 2, 8, 5))
-        pygame.draw.ellipse(self.screen, (255, 255, 200), (cx + 26, cy + 2, 8, 5))
-        
-        # Taillights
-        pygame.draw.ellipse(self.screen, (255, 0, 0), (cx + 6, cy + 63, 8, 5))
-        pygame.draw.ellipse(self.screen, (255, 0, 0), (cx + 26, cy + 63, 8, 5))
-        
-        # Side mirrors
-        pygame.draw.rect(self.screen, (150, 150, 150), (cx - 2, cy + 28, 3, 6))
-        pygame.draw.rect(self.screen, (150, 150, 150), (cx + 39, cy + 28, 3, 6))
-        
-        # Door lines
-        pygame.draw.line(self.screen, (150, 20, 40), (cx + 8, cy + 25), (cx + 8, cy + 55), 1)
-        pygame.draw.line(self.screen, (150, 20, 40), (cx + 32, cy + 25), (cx + 32, cy + 55), 1)
-    
+        scan_x = lidar_x + math.cos(angle) * 5
+        scan_y = lidar_y + math.sin(angle) * 5
+        pygame.draw.line(screen, LIDAR_GLOW, (lidar_x, lidar_y), (scan_x, scan_y), 2)
+
+        # --- 7. WAYMO / JAGUAR LOGO DETAILS ---
+        # Jaguar "Grille" emblem
+        pygame.draw.rect(screen, (20, 20, 20), (cx + 12, cy + 2, w - 24, 4), border_radius=2)
+        # Red Growler logo dot
+        pygame.draw.circle(screen, (200, 0, 0), (cx + w//2, cy + 4), 2)
+
+        # Rear Taillights (Sleek horizontal lines)
+        pygame.draw.rect(screen, (200, 0, 0), (cx + 4, cy + h - 4, 10, 3))
+        pygame.draw.rect(screen, (200, 0, 0), (cx + w - 14, cy + h - 4, 10, 3))
+
     def draw_ui(self):
         """Render score and game information."""
         # Score and overtakes
@@ -448,7 +504,7 @@ class HighwayGame:
         Uses stricter checking to ensure player always has escape route.
         """
         # Check a larger danger zone at the top of screen
-        DANGER_ZONE = 250  # Increased from 150
+        DANGER_ZONE = 200  # Increased from 150
         
         # Get lanes that have traffic in the danger zone
         blocked_lanes = set()
@@ -475,12 +531,12 @@ class HighwayGame:
         cars_in_upper_half = sum(1 for car in self.traffic if car.y < SCREEN_HEIGHT // 2)
         
         # Don't spawn if too many cars already in upper area
-        MAX_CARS_UPPER = 4
+        MAX_CARS_UPPER = 8
         return cars_in_upper_half < MAX_CARS_UPPER
 
 
 # ============================================================
-#                        Main Game Loop
+#                         Main Game Loop
 # ============================================================
 
 def main():
