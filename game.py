@@ -241,7 +241,7 @@ class HighwayGame:
         if self.game_over:
             return
         
-        # Smooth lane transition
+        # Smooth lane transition ( Need to work on this transition to add an smooth cross slide car in which side it want to go )
         if self.is_changing_lane:
             target_x = ROAD_X + self.target_lane * LANE_WIDTH + (LANE_WIDTH - CAR_WIDTH) // 2
             current_x = ROAD_X + self.lane_index * LANE_WIDTH + (LANE_WIDTH - CAR_WIDTH) // 2 + self.car_x_offset
@@ -276,6 +276,9 @@ class HighwayGame:
                 self.score += 15  # Bonus for overtaking
             
             # Remove cars that went off screen
+            """ personally  i really want to keep car that we overken and disappered from screen but there is problem like it will apper from behind and can crash to car player's  car.
+             if i keep that it will looks more realistic i need more time to think on this 
+             i have idea like implement that  other traffic car detect player car and keep distance between them  but need time to work on this  """ 
             if car.is_off_screen():
                 self.traffic.remove(car)
                 self.score += 5  # Small score for distance
