@@ -11,12 +11,13 @@ Controls:
   * RIGHT/D: Change lane right
 - ESC: Quit game
 
-By Prem Patel (Refactored for realistic overtaking gameplay)
+By Prem Patel  
 """
 
 import sys
 import random
 import pygame
+import tensorflow as tf
 
 pygame.init()
 
@@ -24,7 +25,7 @@ pygame.init()
 #                   Global Configuration
 # ============================================================
 
-# Screen & Road
+# Screen & Roadfi
 SCREEN_WIDTH, SCREEN_HEIGHT = 800, 600
 ROAD_WIDTH = 500
 ROAD_X = (SCREEN_WIDTH - ROAD_WIDTH) // 2
@@ -50,6 +51,16 @@ MAX_PLAYER_SPEED = 20
 TRAFFIC_MIN_SPEED = 5          # Slower traffic to overtake
 TRAFFIC_MAX_SPEED = 9
 SPAWN_INTERVAL = 1000           # milliseconds between spawns
+
+# ============================================================
+#                    Planing for implementation of agent
+# ============================================================
+
+# reset
+# reward
+# we need to change play(action) so that -> agent can change lanes
+# game_iteration
+# and last to check is if it is collision  function
 
 # ============================================================
 #                    Traffic Car Class
