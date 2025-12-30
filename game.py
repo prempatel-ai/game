@@ -284,7 +284,7 @@ class HighwayGame:
         if self.game_over:
             return
         
-        # Smooth lane transition ( Need to work on this transition to add an smooth cross slide car in which side it want to go )
+        # Smooth lane transition ( Need to work on this transition to add an smooth tilt on side which side car in which side it want to go )
         if self.is_changing_lane:
             target_x = ROAD_X + self.target_lane * LANE_WIDTH + (LANE_WIDTH - CAR_WIDTH) // 2
             current_x = ROAD_X + self.lane_index * LANE_WIDTH + (LANE_WIDTH - CAR_WIDTH) // 2 + self.car_x_offset
