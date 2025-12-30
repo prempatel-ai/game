@@ -15,6 +15,7 @@ By Prem Patel
 
 import sys
 import random
+import math  # Added for steering physics
 import pygame
 import tensorflow as tf
 
@@ -249,6 +250,7 @@ class HighwayGame:
         self.target_lane = 1  # Lane we're moving towards
         self.car_x_offset = 0  # Smooth position offset for lane transitions
         self.car_y = SCREEN_HEIGHT - 150  # Player position
+        self.car_angle = 0  # NEW: For steering rotation
         self.speed = PLAYER_BASE_SPEED
         self.road_offset = 0
         self.traffic = []
@@ -285,21 +287,51 @@ class HighwayGame:
             return
         
         # Smooth lane transition ( Need to work on this transition to add an smooth tilt on side which side car in which side it want to go )
+        # Smooth lane transition (Ease-In-Out Physics with Rotation)
         if self.is_changing_lane:
+            # 1. Calculate targets
             target_x = ROAD_X + self.target_lane * LANE_WIDTH + (LANE_WIDTH - CAR_WIDTH) // 2
             current_x = ROAD_X + self.lane_index * LANE_WIDTH + (LANE_WIDTH - CAR_WIDTH) // 2 + self.car_x_offset
             
-            transition_speed = 8
+            # 2. Calculate distance remaining
+            dist = target_x - current_x
             
-            if abs(target_x - current_x) < transition_speed:
-                self.lane_index = self.target_lane
-                self.car_x_offset = 0
-                self.is_changing_lane = False
-            else:
-                if target_x > current_x:
-                    self.car_x_offset += transition_speed
-                else:
-                    self.car_x_offset -= transition_speed
+            # 3. Dynamic Speed Calculation (The "Physics" Part)
+            # Calculate how far we have already moved relative to the full lane width
+            moved_dist = abs(self.car_x_offset)
+            remaining_dist = abs(LANE_WIDTH - moved_dist)
+            
+            # Formula: Speed is proportional to the distance from the closest "edge"
+            base_speed = min(moved_dist, remaining_dist) * 0.2
+            transition_speed = max(4.0, base_speed)
+            
+            # 4. Rotation Math (Steering)
+            # Calculate progress (0.0 to 1.0)
+            progress = moved_dist / LANE_WIDTH if LANE_WIDTH > 0 else 0
+            # Use Sine wave for smooth steering: 0 -> Max Angle -> 0
+            max_angle = 20 # Maximum steering angle
+            rotation = math.sin(progress * 3.14159) * max_angle
+
+            # 5. Apply Movement and Rotation
+            if target_x > current_x: # Moving Right
+                self.car_angle = -rotation # Rotate negative
+                self.car_x_offset += transition_speed
+                if self.car_x_offset >= LANE_WIDTH: # Snap logic
+                    self.lane_index = self.target_lane
+                    self.car_x_offset = 0
+                    self.car_angle = 0
+                    self.is_changing_lane = False
+            else: # Moving Left
+                self.car_angle = rotation # Rotate positive
+                self.car_x_offset -= transition_speed
+                if self.car_x_offset <= -LANE_WIDTH: # Snap logic
+                    self.lane_index = self.target_lane
+                    self.car_x_offset = 0
+                    self.car_angle = 0
+                    self.is_changing_lane = False
+        else:
+             # Gradually straighten out if not changing lanes (safety)
+            self.car_angle *= 0.8
         
         # Update traffic cars
         player_rect = self.get_car_rect()
@@ -367,88 +399,79 @@ class HighwayGame:
                 )
     
     def draw_car(self):
-        """Render the Hero Car as a Waymo (Jaguar I-PACE style) with LiDAR."""
-        # Calculate coordinates
-        cx = int(ROAD_X + self.lane_index * LANE_WIDTH + (LANE_WIDTH - CAR_WIDTH) // 2 + self.car_x_offset)
-        cy = int(self.car_y)
+        """Render the Waymo Car with Rotation (Steering)."""
+        # 1. Create a temporary surface to draw the car (so we can rotate it)
+        # Make it larger than car to fit rotation without clipping
+        surf_w, surf_h = CAR_WIDTH + 40, CAR_HEIGHT + 40
+        car_surf = pygame.Surface((surf_w, surf_h), pygame.SRCALPHA)
+        
+        # Center of the temporary surface
+        cx, cy = surf_w // 2, surf_h // 2
+        
+        # Draw the Waymo design relative to the center (cx, cy)
+        # We offset coordinates by -CAR_WIDTH/2 and -CAR_HEIGHT/2 to center drawing
+        ox = cx - CAR_WIDTH // 2
+        oy = cy - CAR_HEIGHT // 2
         w, h = CAR_WIDTH, CAR_HEIGHT
-        screen = self.screen
 
-        # Colors
-        WAYMO_WHITE = (245, 245, 245) # Classic Waymo White
+        # --- Waymo Design Drawing on car_surf ---
+        WAYMO_WHITE = (245, 245, 245)
         SENSOR_BLACK = (10, 10, 10)
         GLASS_COLOR = (20, 25, 30)
-        LIDAR_GLOW = (0, 255, 100) # Tech Green/Cyan scanning color
+        LIDAR_GLOW = (0, 255, 100)
 
-        # --- 1. SHADOW ---
-        shadow_surf = pygame.Surface((w + 10, h + 10), pygame.SRCALPHA)
-        pygame.draw.ellipse(shadow_surf, (0, 0, 0, 60), (0, 0, w + 10, h + 10))
-        screen.blit(shadow_surf, (cx - 5, cy + 2))
-
-        # --- 2. TIRES ---
-        wheel_positions = [
-            (cx, cy + 10),           # Front Left
-            (cx + w - 6, cy + 10),   # Front Right
-            (cx, cy + h - 18),       # Rear Left
-            (cx + w - 6, cy + h - 18)# Rear Right
-        ]
-        for wx, wy in wheel_positions:
-            pygame.draw.rect(screen, (30, 30, 30), (wx, wy, 6, 12), border_radius=2)
-
-        # --- 3. MAIN BODY (SUV Shape) ---
-        # Slightly boxier/wider at the back for the I-PACE look
-        pygame.draw.rect(screen, WAYMO_WHITE, (cx, cy, w, h), border_radius=10)
+        # Shadow (drawn on main screen later to stay flat)
         
-        # --- 4. CORNER SENSORS (The "Waymo" Signature) ---
-        # Little black pods on the 4 corners
-        sensor_size = 4
-        # Front Left
-        pygame.draw.rect(screen, SENSOR_BLACK, (cx - 2, cy + 8, sensor_size, sensor_size + 4), border_radius=1)
-        # Front Right
-        pygame.draw.rect(screen, SENSOR_BLACK, (cx + w - 2, cy + 8, sensor_size, sensor_size + 4), border_radius=1)
-        # Rear Left
-        pygame.draw.rect(screen, SENSOR_BLACK, (cx - 2, cy + h - 15, sensor_size, sensor_size + 4), border_radius=1)
-        # Rear Right
-        pygame.draw.rect(screen, SENSOR_BLACK, (cx + w - 2, cy + h - 15, sensor_size, sensor_size + 4), border_radius=1)
+        # Tires
+        for wx, wy in [(ox, oy + 10), (ox + w - 6, oy + 10), (ox, oy + h - 18), (ox + w - 6, oy + h - 18)]:
+            pygame.draw.rect(car_surf, (30, 30, 30), (wx, wy, 6, 12), border_radius=2)
 
-        # --- 5. GLASS ROOF & WINDSHIELD ---
-        # Large panoramic glass
-        glass_pts = [
-            (cx + 6, cy + 15),     # Front Left
-            (cx + w - 6, cy + 15), # Front Right
-            (cx + w - 8, cy + h - 10), # Rear Right
-            (cx + 8, cy + h - 10)  # Rear Left
-        ]
-        pygame.draw.polygon(screen, GLASS_COLOR, glass_pts)
+        # Body
+        pygame.draw.rect(car_surf, WAYMO_WHITE, (ox, oy, w, h), border_radius=10)
+        
+        # Corner Sensors
+        s_size = 4
+        for sx, sy in [(ox-2, oy+8), (ox+w-2, oy+8), (ox-2, oy+h-15), (ox+w-2, oy+h-15)]:
+            pygame.draw.rect(car_surf, SENSOR_BLACK, (sx, sy, s_size, s_size+4), border_radius=1)
 
-        # --- 6. LIDAR DOME (The Roof Scanner) ---
-        # The main cylinder on top
-        lidar_x, lidar_y = cx + w//2, cy + h//2 - 5
-        
-        # Base of LiDAR
-        pygame.draw.circle(screen, (50, 50, 50), (lidar_x, lidar_y), 7)
-        # Top of LiDAR (Black)
-        pygame.draw.circle(screen, (0, 0, 0), (lidar_x, lidar_y), 5)
-        
-        # "Scanning" Effect - A rotating line or pulse
-        # We use current time to animate the angle
-        import math
+        # Glass Roof
+        glass_pts = [(ox+6, oy+15), (ox+w-6, oy+15), (ox+w-8, oy+h-10), (ox+8, oy+h-10)]
+        pygame.draw.polygon(car_surf, GLASS_COLOR, glass_pts)
+
+        # LiDAR Dome
+        lidar_x, lidar_y = ox + w//2, oy + h//2 - 5
+        pygame.draw.circle(car_surf, (50, 50, 50), (lidar_x, lidar_y), 7)
+        pygame.draw.circle(car_surf, (0, 0, 0), (lidar_x, lidar_y), 5)
+        # Scan animation
         time_now = pygame.time.get_ticks()
-        angle = (time_now % 1000) / 1000.0 * 6.28 # Full rotation every 1 second
-        
+        angle = (time_now % 1000) / 1000.0 * 6.28
         scan_x = lidar_x + math.cos(angle) * 5
         scan_y = lidar_y + math.sin(angle) * 5
-        pygame.draw.line(screen, LIDAR_GLOW, (lidar_x, lidar_y), (scan_x, scan_y), 2)
+        pygame.draw.line(car_surf, LIDAR_GLOW, (lidar_x, lidar_y), (scan_x, scan_y), 2)
 
-        # --- 7. WAYMO / JAGUAR LOGO DETAILS ---
-        # Jaguar "Grille" emblem
-        pygame.draw.rect(screen, (20, 20, 20), (cx + 12, cy + 2, w - 24, 4), border_radius=2)
-        # Red Growler logo dot
-        pygame.draw.circle(screen, (200, 0, 0), (cx + w//2, cy + 4), 2)
+        # Logos/Lights
+        pygame.draw.rect(car_surf, (20, 20, 20), (ox + 12, oy + 2, w - 24, 4), border_radius=2) # Grille
+        pygame.draw.rect(car_surf, (200, 0, 0), (ox + 4, oy + h - 4, 10, 3)) # Tail Left
+        pygame.draw.rect(car_surf, (200, 0, 0), (ox + w - 14, oy + h - 4, 10, 3)) # Tail Right
 
-        # Rear Taillights (Sleek horizontal lines)
-        pygame.draw.rect(screen, (200, 0, 0), (cx + 4, cy + h - 4, 10, 3))
-        pygame.draw.rect(screen, (200, 0, 0), (cx + w - 14, cy + h - 4, 10, 3))
+        # 2. Rotate the surface
+        rotated_surf = pygame.transform.rotate(car_surf, self.car_angle)
+        
+        # 3. Blit to screen
+        # Calculate screen position (where the center of the car is)
+        screen_x = int(ROAD_X + self.lane_index * LANE_WIDTH + (LANE_WIDTH - CAR_WIDTH) // 2 + self.car_x_offset)
+        screen_y = int(self.car_y)
+        
+        # Align center of rotated surface with center of car position
+        rect = rotated_surf.get_rect(center=(screen_x + CAR_WIDTH//2, screen_y + CAR_HEIGHT//2))
+        
+        # Draw Shadow first (non-rotating)
+        shadow_surf = pygame.Surface((w + 10, h + 10), pygame.SRCALPHA)
+        pygame.draw.ellipse(shadow_surf, (0, 0, 0, 60), (0, 0, w + 10, h + 10))
+        self.screen.blit(shadow_surf, (screen_x - 5, screen_y + 2))
+        
+        # Draw Rotating Car
+        self.screen.blit(rotated_surf, rect.topleft)
 
     def draw_ui(self):
         """Render score and game information."""
