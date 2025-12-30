@@ -52,6 +52,10 @@ TRAFFIC_MIN_SPEED = 5          # Slower traffic to overtake
 TRAFFIC_MAX_SPEED = 9
 SPAWN_INTERVAL = 1000           # milliseconds between spawns
 
+# LiDAR Settings
+LIDAR_MAX_DIST = 300            # Max distance rays can see
+LIDAR_RAY_COUNT = 5             # Number of rays
+
 # ============================================================
 #                    Planing for implementation of agent
 # ============================================================
@@ -138,7 +142,7 @@ class TrafficCar:
         shadow_surf = pygame.Surface((w + 4, h + 4), pygame.SRCALPHA)
         pygame.draw.rect(shadow_surf, (0, 0, 0, 60), (0, 0, w + 4, h + 4), border_radius=4)
         screen.blit(shadow_surf, (cx - 2, cy + 4))
-
+        
         # --- 2. TIRES (Pixel Style) ---
         # Just small dark nubs sticking out slightly
         tire_positions = [cy + 12, cy + h - 18]
@@ -258,6 +262,7 @@ class HighwayGame:
         self.overtakes = 0  # Count successful overtakes
         self.game_over = False
         self.is_changing_lane = False
+        self.lidar_readings = [] # Store tuple of (start_pos, end_pos, color)
     
     def handle_input(self):
         """Process keyboard input for speed control."""
@@ -281,6 +286,61 @@ class HighwayGame:
                 self.target_lane += 1
                 self.is_changing_lane = True
     
+    def cast_lidar(self):
+        """
+        Simulate LiDAR rays. 
+        Casts rays in different angles to detect obstacles.
+        Updates self.lidar_readings with line coordinates and colors.
+        """
+        self.lidar_readings = []
+        
+        # Calculate current car center
+        cx = ROAD_X + self.lane_index * LANE_WIDTH + (LANE_WIDTH - CAR_WIDTH) // 2 + self.car_x_offset + CAR_WIDTH // 2
+        cy = self.car_y + CAR_HEIGHT // 2
+        start_pos = (cx, cy)
+        
+        # Ray angles relative to car (in degrees)
+        # 0 is UP, -90 is LEFT, 90 is RIGHT
+        # We add self.car_angle so the rays rotate WITH the car (Realism)
+        # We convert to radians for math. sin/cos logic:
+        # X = sin(angle), Y = -cos(angle) because Y=0 is top of screen
+        
+        angles = [-50, -25, 0, 25, 50] # 5 Rays: Hard Left, Left, Straight, Right, Hard Right
+        
+        for angle_deg in angles:
+            # Combine fixed ray angle with current steering angle
+            # Note: car_angle is usually small (-20 to 20), this adds subtle tilt to rays
+            total_angle = math.radians(angle_deg + self.car_angle)
+            
+            # Direction vector
+            dir_x = math.sin(total_angle)
+            dir_y = -math.cos(total_angle)
+            
+            end_pos = (cx + dir_x * LIDAR_MAX_DIST, cy + dir_y * LIDAR_MAX_DIST)
+            color = (0, 255, 0) # Green by default (Safe)
+            hit = False
+            
+            # Ray Casting Steps (Step by 5 pixels for performance)
+            # We "walk" along the ray to see if we hit a car
+            for i in range(0, LIDAR_MAX_DIST, 5):
+                check_x = cx + dir_x * i
+                check_y = cy + dir_y * i
+                
+                # Check collision with any traffic car
+                point_rect = pygame.Rect(check_x - 2, check_y - 2, 4, 4) # Small point
+                
+                for car in self.traffic:
+                    if car.get_rect().colliderect(point_rect):
+                        end_pos = (check_x, check_y)
+                        color = (255, 0, 0) # Red (Danger/Hit)
+                        hit = True
+                        break # Stop checking this ray
+                
+                if hit:
+                    break
+            
+            self.lidar_readings.append((start_pos, end_pos, color))
+
     def update(self):
         """Update game state."""
         if self.game_over:
@@ -366,6 +426,9 @@ class HighwayGame:
         
         # Update road animation - moves backward since we're moving forward
         self.road_offset = (self.road_offset + self.speed) % 50
+        
+        # Update LiDAR
+        self.cast_lidar()
     
     def get_car_rect(self):
         """Get player car's collision rectangle with smooth lane transitions."""
@@ -413,6 +476,7 @@ class HighwayGame:
         ox = cx - CAR_WIDTH // 2
         oy = cy - CAR_HEIGHT // 2
         w, h = CAR_WIDTH, CAR_HEIGHT
+        
 
         # --- Waymo Design Drawing on car_surf ---
         WAYMO_WHITE = (245, 245, 245)
@@ -473,6 +537,13 @@ class HighwayGame:
         # Draw Rotating Car
         self.screen.blit(rotated_surf, rect.topleft)
 
+    def draw_lidar(self):
+        """Render the LiDAR rays on screen."""
+        for start, end, color in self.lidar_readings:
+            pygame.draw.line(self.screen, color, start, end, 2)
+            # Draw a small dot at the hit point
+            pygame.draw.circle(self.screen, color, end, 3)
+
     def draw_ui(self):
         """Render score and game information."""
         # Score and overtakes
@@ -514,6 +585,9 @@ class HighwayGame:
         # Draw all traffic cars
         for car in self.traffic:
             car.draw(self.screen)
+        
+        # Draw LiDAR UNDER the car (so the car is on top)
+        self.draw_lidar()
         
         self.draw_car()
         self.draw_ui()
